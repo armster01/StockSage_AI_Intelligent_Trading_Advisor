@@ -1,134 +1,141 @@
 import streamlit as st
-import pandas as pd
+import plotly.graph_objects as go
+from utils import StockAnalyzer
 from config import Config
-from utils import (
-    get_stock_data,
-    calculate_technical_indicators,
-    create_stock_chart,
-    get_ai_analysis,
-    generate_trade_signals
-)
+import asyncio
 
-def main():
-    st.set_page_config(page_title="Stock Market Advisor", layout="wide")
+class StockSageApp:
+    def __init__(self):
+        self.config = Config()
+        self.analyzer = StockAnalyzer()
+        
+    def setup_page(self):
+        """Configure Streamlit page settings"""
+        st.set_page_config(
+            page_title="StockSage AI",
+            page_icon="📈",
+            layout="wide"
+        )
+        st.title("📈 StockSage AI")
+        st.subheader("AI-Powered Stock Analysis with Gemini")
     
-    st.title("Stock Market Advisor")
+    def create_sidebar(self):
+        """Create and handle sidebar inputs"""
+        st.sidebar.title("Analysis Parameters")
+        ticker = st.sidebar.text_input(
+            "Enter Stock Ticker",
+            self.config.DEFAULT_TICKER
+        ).upper()
+        
+        sector = st.sidebar.selectbox(
+            "Select Sector",
+            list(self.config.SECTOR_CONFIGS.keys())
+        )
+        
+        return ticker, sector
     
-    # Sidebar - User Settings
-    st.sidebar.header("Settings")
+    def plot_stock_chart(self, data):
+        """Create interactive stock price chart"""
+        if data.empty:
+            st.error("No data available for the selected stock.")
+            return None
+            
+        fig = go.Figure(data=[go.Candlestick(
+            x=data.index,
+            open=data['Open'],
+            high=data['High'],
+            low=data['Low'],
+            close=data['Close'],
+            name="OHLC"
+        )])
+        
+        # Add moving averages if enough data points are available
+        if len(data) >= 20:
+            fig.add_trace(go.Scatter(
+                x=data.index,
+                y=data['SMA20'],
+                name="20 Day MA",
+                line=dict(color='orange')
+            ))
+        
+        if len(data) >= 50:
+            fig.add_trace(go.Scatter(
+                x=data.index,
+                y=data['SMA50'],
+                name="50 Day MA",
+                line=dict(color='blue')
+            ))
+        
+        fig.update_layout(
+            title="Stock Price Analysis",
+            yaxis_title="Price",
+            xaxis_title="Date",
+            template="plotly_white"
+        )
+        
+        return fig
     
-    # Stock Symbol Input
-    symbol = st.sidebar.text_input("Enter Stock Symbol", "AAPL").upper()
-    
-    # Time Period Selection
-    timeframe = st.sidebar.selectbox(
-        "Select Time Period",
-        ["1mo", "3mo", "6mo", "1y", "2y", "5y"],
-        index=2
-    )
-    
-    # Risk Profile
-    risk_tolerance = st.sidebar.selectbox(
-        "Risk Tolerance",
-        ["Conservative", "Moderate", "Aggressive"],
-        index=1
-    )
-    
-    # Investment Budget
-    budget = st.sidebar.number_input(
-        "Investment Budget ($)",
-        min_value=1000,
-        value=Config.DEFAULT_BUDGET,
-        step=1000
-    )
-    
-    # Fetch and process stock data
-    df = get_stock_data(symbol, timeframe)
-    
-    # 🛠 Debugging: Display fetched data
-    st.write("Fetched Data Preview:", df.head())
-
-    # ✅ Handling Empty DataFrame
-    if df is None or df.empty:
-        st.error("Stock data is empty. Please check the symbol or try a different time period.")
-        return
-
-    # ✅ Ensure 'Close' Column Exists
-    if 'Close' not in df.columns:
-        st.error("Close price data is missing. Try a different stock or period.")
-        return
-    
-    # Calculate technical indicators
-    df = calculate_technical_indicators(df)
-    
-    # Display stock chart in full width
-    st.subheader("Stock Chart and Technical Analysis")
-    chart = create_stock_chart(df, symbol)
-    st.plotly_chart(chart, use_container_width=True)
-    
-    # Display current price and basic stats in columns
-    col1, col2, col3 = st.columns(3)
-    
-    current_price = df['Close'].iloc[-1]
-    price_change = df['Close'].iloc[-1] - df['Close'].iloc[-2]
-    price_change_pct = (price_change / df['Close'].iloc[-2]) * 100
-    
-    with col1:
-        st.metric(
-            "Current Price",
-            f"${current_price:.2f}",
-            f"{price_change_pct:.2f}%"
+    def display_technical_indicators(self, data):
+        """Display technical analysis indicators"""
+        if data is None or 'technical_indicators' not in data:
+            st.error("Technical indicators data not available.")
+            return
+            
+        tech_data = data['technical_indicators']
+        
+        cols = st.columns(4)
+        cols[0].metric("Trend", tech_data['trend'])
+        cols[1].metric("RSI", f"{tech_data['rsi']:.2f}")
+        cols[2].metric("Volatility", f"{tech_data['volatility']:.2%}")
+        cols[3].metric(
+            "Price Action",
+            "Above MA" if tech_data['sma20'] > tech_data['sma50'] else "Below MA"
         )
     
-    with col2:
-        st.metric("RSI", f"{df['RSI'].iloc[-1]:.2f}")
-    
-    with col3:
-        st.metric("MACD", f"{df['MACD'].iloc[-1]:.2f}")
-    
-    # AI Analysis and Trading Signals in two columns
-    col_analysis, col_signals = st.columns(2)
-    
-    with col_analysis:
-        st.subheader("AI Analysis")
-        analysis = get_ai_analysis(df, symbol)
-        st.write(analysis)
-    
-    with col_signals:
-        st.subheader("Trading Signals")
-        signals = generate_trade_signals(df)
+    async def run(self):
+        """Main application loop"""
+        self.setup_page()
+        ticker, sector = self.create_sidebar()
         
-        if signals:
-            for signal, reason in signals:
-                color = "green" if signal == "BUY" else "red"
-                st.markdown(
-                    f"<div style='padding: 10px; border-radius: 5px; "
-                    f"background-color: {color}; color: white;'>"
-                    f"<b>{signal}</b>: {reason}</div>",
-                    unsafe_allow_html=True
-                )
-        else:
-            st.info("No clear trading signals at the moment.")
-    
-    # Position Sizing Calculator
-    st.subheader("Position Sizing")
-    max_position = budget * (
-        0.02 if risk_tolerance == "Conservative"
-        else 0.05 if risk_tolerance == "Moderate"
-        else 0.10
-    )
-    
-    shares = int(max_position / current_price)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write(f"Recommended Position:")
-        st.write(f"- Shares: {shares}")
-        st.write(f"- Total Value: ${(shares * current_price):.2f}")
-    with col2:
-        st.write("Risk Profile:")
-        st.write(f"- Maximum Position Size: ${max_position:.2f}")
-        st.write(f"- Risk Level: {risk_tolerance}")
+        if st.sidebar.button("Analyze"):
+            try:
+                with st.spinner("Fetching data and generating analysis..."):
+                    # Get stock data
+                    stock_data = self.analyzer.get_stock_data(ticker)
+                    
+                    if stock_data is None or stock_data['historical_data'].empty:
+                        st.error(f"No data available for ticker {ticker}. Please check if the ticker symbol is correct.")
+                        return
+                    
+                    # Create tabs
+                    tab1, tab2, tab3 = st.tabs([
+                        "Stock Analysis",
+                        "Technical Indicators",
+                        "AI Insights"
+                    ])
+                    
+                    with tab1:
+                        chart = self.plot_stock_chart(stock_data['historical_data'])
+                        if chart is not None:
+                            st.plotly_chart(chart, use_container_width=True)
+                    
+                    with tab2:
+                        self.display_technical_indicators(stock_data)
+                    
+                    with tab3:
+                        ai_analysis = await self.analyzer.get_ai_analysis(
+                            ticker,
+                            stock_data,
+                            sector
+                        )
+                        st.markdown(ai_analysis)
+                
+            except Exception as e:
+                st.error(f"Error analyzing stock: {str(e)}")
+
+def main():
+    app = StockSageApp()
+    asyncio.run(app.run())
 
 if __name__ == "__main__":
     main()
