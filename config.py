@@ -1,24 +1,50 @@
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
+
 class Config:
-    # Gemini API settings
-    MODEL_NAME = "gemini-pro"
-    TEMPERATURE = 0.7
-    MAX_TOKENS = 1024
+    # API Configuration
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    
+    # Default Parameters
+    DEFAULT_TICKER = os.getenv('DEFAULT_TICKER', 'AAPL')
+    DATA_CACHE_DURATION = int(os.getenv('DATA_CACHE_DURATION', 3600))
+    
+    # Sector Configurations
+    SECTOR_CONFIGS = {
+        'Technology': {
+            'key_metrics': ['R&D Expenses', 'Revenue Growth', 'Profit Margin'],
+            'analysis_focus': ['Innovation', 'Market Share', 'Competition']
+        },
+        'Healthcare': {
+            'key_metrics': ['FDA Approvals', 'Clinical Trials', 'Patent Portfolio'],
+            'analysis_focus': ['Regulatory Environment', 'Research Pipeline', 'Market Access']
+        },
+        'Finance': {
+            'key_metrics': ['Net Interest Margin', 'NPL Ratio', 'Capital Adequacy'],
+            'analysis_focus': ['Interest Rates', 'Credit Quality', 'Regulatory Compliance']
+        },
+        'Energy': {
+            'key_metrics': ['Production Costs', 'Reserves', 'Environmental Impact'],
+            'analysis_focus': ['Commodity Prices', 'Sustainability', 'Regulations']
+        }
+    }
+    
+    # Gemini Model Configuration
+    MODEL_CONFIG = {
+        'temperature': 0.7,
+        'top_p': 0.8,
+        'top_k': 40,
+        'max_output_tokens': 2048,
+    }
     
     # Technical Analysis Parameters
-    RSI_PERIOD = 14
-    RSI_OVERBOUGHT = 70
-    RSI_OVERSOLD = 30
-    
-    MACD_FAST = 12
-    MACD_SLOW = 26
-    MACD_SIGNAL = 9
-    
-    MA_SHORT = 20
-    MA_LONG = 50
-    
-    # Portfolio Settings
-    DEFAULT_BUDGET = 10000
-    DEFAULT_RISK_TOLERANCE = "Moderate"  # Conservative, Moderate, Aggressive
-    
-    # Time periods
-    DEFAULT_TIMEFRAME = "6mo"  # Valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
+    TECHNICAL_PARAMS = {
+        'short_term_ma': 20,
+        'long_term_ma': 50,
+        'rsi_period': 14,
+        'volatility_window': 20
+    }
