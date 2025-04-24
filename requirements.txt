@@ -1,8 +1,9 @@
-google-generativeai==0.3.1
-python-dotenv==1.0.0
-streamlit==1.24.0
-yfinance==0.2.54
-pandas==2.0.3
-plotly==5.15.0
-numpy==1.24.3
-python-dateutil==2.8.2
+streamlit==1.44.1 
+yfinance==0.2.44 
+pandas==2.2.3 
+numpy==1.26.4  
+backtesting==0.3.3 
+requests==2.32.3 
+python-dotenv==1.0.1 
+google-cloud-aiplatform==1.70.0 
+plotly==5.24.1
